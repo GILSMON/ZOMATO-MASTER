@@ -17,12 +17,29 @@ Method        POST
 
 Router.post("/signup", async(req,res) => {
   try {
-await UserModel.findEmailAndPhone(req.body.credentials);
+    const { email, password, fullname, phoneNumber} = req.body.credentials;
+
+    //Check whether email or phone number exists
+    const checkUserByEmail = await UserModel.findOne({ email });
+   const checkUserByPhone = await UserModel.findOne({ phoneNumber });
+
+   if(checkUserByEmail || checkUserByPhone) {
+     return res.json({ error: "User already Exists"});
+   }
+
+   //hashing and salting
+   const bcryptSalt = await bcrypt.genSalt(8);
+
+   const hashedPassword = await bcrypt.hash(password, bcryptSalt);
+
 //DB
-   const newUser = await UserModel.create(req.body.credentials);
+   await UserModel.create({
+    ...req.body.credentials,
+    password: hashedPassword     
+   });
 
    //JWT Auth Token
-   const token = newUser.generateJwtToken();
+   const token = jwt.sign({user: {fullname, email}}, "ZomatoApp");
 
    return res.status(200).json({token});
 
@@ -30,32 +47,5 @@ await UserModel.findEmailAndPhone(req.body.credentials);
     return res.status(500).json({error: error.message});
   }
 });
-
-
-/*
-Route         /signin
-Descrip       Signin with email and password
-Params        None
-Access        Public
-Method        POST
-*/
-
-Router.post("/signin", async(req,res) => {
-  try {
-
-    const user = await UserModel.findByEmailAndPassword(
-      req.body.credentials
-    );
-
-   //JWT Auth Token
-   const token = user.generateJwtToken();
-
-   return res.status(200).json({token, status: "Success"});
-
-  } catch (error) {
-    return res.status(500).json({error: error.message});
-  }
-});
-
 
 export default Router;
